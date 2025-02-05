@@ -26,7 +26,7 @@ if min15_response.status_code == 200:
 else:
     print("failas robots.txt nerastas.")
 
-# 4
+#   4
 # min15_response = requests.get("https://15min.lt") kartojasi kintamasis
 
 # min15_soup = BeautifulSoup(min15_response.text, "html.parser") kartojasi kintamasis
