@@ -159,12 +159,14 @@ def add_data():
     with sqlite3.connect("heading_database.db") as conn:
         c = conn.cursor()
         for text in heading_text_list:
-            c.execute(f"INSERT INTO antrasciu_struktura VALUES ('{text["heading"]}', '{text["your_suggestion"]}')")
-            conn.commit()
+            c.execute("INSERT INTO antrasciu_struktura (heading, your_suggestion) VALUES (?, ?)", 
+                      (text["heading"], text["your_suggestion"]))
+            
     with sqlite3.connect("webpage_database.db") as conn:
         c = conn.cursor()
         for text in corection_text_list:
-            c.execute(f"INSERT INTO teksto_korekcijos_rekomendacijos VALUES ('{text["original_word"]}', '{text["suggested_correction"]}', '{text["reasoning"]}')")
+            c.execute("INSERT INTO teksto_korekcijos_rekomendacijos (original_word, suggested_correction, reasoning) VALUES (?, ?, ?)", 
+                      (text["original_word"], text["suggested_correction"], text["reasoning"]))
             conn.commit()
              
 
