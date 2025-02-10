@@ -145,6 +145,7 @@ teksto_korekcijos_rekomendacijos_create_query = """
                 )
             """
 insert_into_antrasciu_struktura_query = "INSERT INTO antrasciu_struktura (heading, your_suggestion) VALUES ('{heading}', '{suggestion}')"
+insert_into_teksto_korekcijos = "INSERT INTO teksto_korekcijos_rekomendacijos (original_word, suggested_correction, reasoning) VALUES ('{original_word}', '{suggested_correction}', '{reasoning}')"
 
 
 def execute_query(database, query):
@@ -172,13 +173,13 @@ def add_data():
         c = conn.cursor()
         for text in corection_text_list:
             c.execute(
-                "INSERT INTO teksto_korekcijos_rekomendacijos (original_word, suggested_correction, reasoning) VALUES (?, ?, ?)",
-                (
-                    text["original_word"],
-                    text["suggested_correction"],
-                    text["reasoning"],
-                ),
+                insert_into_teksto_korekcijos.format(
+                    original_word=text["original_word"],
+                    suggested_correction=text["suggested_correction"],
+                    reasoning=text["reasoning"],
+                )
             )
+
             conn.commit
 
 
