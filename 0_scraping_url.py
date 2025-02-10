@@ -130,60 +130,43 @@ def clean_json_string(json_string):
 
     return cleaned_string.strip()
 
-def create_databases():
-    """Creates the 'teksto_korekcijos_rekomendacijos' table in the given database."""
-    with sqlite3.connect("heading_database.db") as conn: 
-        c = conn.cursor()
-        c.execute("""
+antrasciu_struktura_create_query = """
             CREATE TABLE IF NOT EXISTS antrasciu_struktura (
-                heading TEXT, 
+                heading TEXT,
                 your_suggestion TEXT
             )
-        """)
-        conn.commit()
-        
-        with sqlite3.connect("webpage_database.db") as conn:
-            c = conn.cursor()
-            c.execute("""
+        """
+teksto_korekcijos_rekomendacijos_create_query = """
                 CREATE TABLE IF NOT EXISTS teksto_korekcijos_rekomendacijos (
-                    original_word TEXT, 
-                    suggested_correction TEXT, 
+                    original_word TEXT,
+                    suggested_correction TEXT,
                     reasoning TEXT
                 )
-            """)
-            conn.commit()
+            """
 
-def insert_data(database, table, columns, data_list):
-    """
-    Inserts data safely into an SQLite database.
-
-    Parameters:
-    - database (str): The database filename.
-    - table (str): The name of the table.
-    - columns (list): A list of column names.
-    - data_list (list of dict): A list of dictionaries, each representing a row of data.
-
-    Returns:
-    - None
-    """
+def execute_query(database, query):
     with sqlite3.connect(database) as conn:
         c = conn.cursor()
+        c.execute(query)
+        conn.commit()
 
-        columns_def = ", ".join([f"{col} TEXT" for col in columns])
-        c.execute(f"CREATE TABLE IF NOT EXISTS {table} ({columns_def})")
 
-        placeholders = ", ".join(["?"] * len(columns))
-        query = f"INSERT INTO {table} ({', '.join(columns)}) VALUES ({placeholders})"
+execute_query("heading_database.db", antrasciu_struktura_create_query)
+execute_query("webpage_database.db", teksto_korekcijos_rekomendacijos_create_query)
 
-        for text in data_list:
-            try:
-                values = tuple(text[col] for col in columns)  
-                c.execute(query, values)
-            except Exception as e:
-                print(f"KLAIDA: {e}")  
+def add_data():
 
-heading_columns = ["heading", "your_suggestion"]
-correction_columns = ["original_word", "suggested_correction", "reasoning"]
+    with sqlite3.connect("heading_database.db") as conn:
+        c = conn.cursor()
+        for text in heading_text_list:
+            c.execute(f"INSERT INTO antrasciu_struktura VALUES ('{text["heading"]}', '{text["your_suggestion"]}')")
+            conn.commit()
+    with sqlite3.connect("webpage_database.db") as conn:
+        c = conn.cursor()
+        for text in corection_text_list:
+            c.execute(f"INSERT INTO teksto_korekcijos_rekomendacijos VALUES ('{text["original_word"]}', '{text["suggested_correction"]}', '{text["reasoning"]}')")
+            conn.commit()
+             
 
 url_response = requests.get("https://15min.lt")
 
@@ -218,11 +201,9 @@ except Exception:
     corection_text = clean_json_string(response_2.text)
     corection_text_list = json.loads(corection_text)
 
+add_data()  
 
-create_databases()
 
-heading_columns = ["heading", "your_suggestion"]
-correction_columns = ["original_word", "suggested_correction", "reasoning"]
 
-insert_data("heading_database.db", "antrasciu_struktura", heading_columns, heading_text_list)
-insert_data("webpage_database.db", "teksto_korekcijos_rekomendacijos", correction_columns, corection_text_list)
+
+
