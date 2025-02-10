@@ -159,7 +159,7 @@ execute_query("heading_database.db", antrasciu_struktura_create_query)
 execute_query("webpage_database.db", teksto_korekcijos_rekomendacijos_create_query)
 
 
-def add_data():
+def add_data(heading_text_list, corection_text_list):
     with sqlite3.connect("heading_database.db") as conn:
         c = conn.cursor()
         for text in heading_text_list:
@@ -179,30 +179,6 @@ def add_data():
                     reasoning=text["reasoning"].replace("'", ""),
                 )
             )
-
-
-# def add_data():
-#     with sqlite3.connect("heading_database.db") as conn:
-#         c = conn.cursor()
-#         for text in heading_text_list:
-#             c.execute(
-#                 "INSERT INTO antrasciu_struktura (heading, your_suggestion) VALUES (?, ?)",
-#                 (text["heading"], text["your_suggestion"]),
-#             )
-
-#     with sqlite3.connect("webpage_database.db") as conn:
-#         c = conn.cursor()
-#         for text in corection_text_list:
-#             c.execute(
-#                 "INSERT INTO teksto_korekcijos_rekomendacijos (original_word, suggested_correction, reasoning) VALUES (?, ?, ?)",
-#                 (
-#                     text["original_word"],
-#                     text["suggested_correction"],
-#                     text["reasoning"],
-#                 ),
-#             )
-#             conn.commit()
-
 
 url_response = requests.get("https://15min.lt")
 
@@ -237,4 +213,4 @@ except Exception:
     corection_text = clean_json_string(response_2.text)
     corection_text_list = json.loads(corection_text)
 
-add_data()
+add_data(heading_text_list=heading_text_list, corection_text_list=corection_text_list)
