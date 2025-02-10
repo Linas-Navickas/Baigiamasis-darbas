@@ -3,7 +3,7 @@ import requests
 import os
 import google.generativeai as genai
 from dotenv import load_dotenv
-import json 
+import json
 import re
 import sqlite3
 
@@ -43,25 +43,27 @@ You should provide an answer is following JSON format:
 load_dotenv("./API_raktas.env")
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
- 
+
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel("gemini-1.5-flash-8b")
 
-robots_txt = "https://www.15min.lt/robots.txt"  
+robots_txt = "https://www.15min.lt/robots.txt"
 url_response = requests.get(robots_txt)
 
 if url_response.status_code == 200:
     print("failas robots.txt rastas")
 else:
     print("failas robots.txt nerastas.")
-   
+
 
 def extract_meta(url_soup):
     meta_description = url_soup.find("meta", attrs={"name": "description"})
     meta_keywords = url_soup.find("meta", attrs={"name": "keywords"})
     return (
         meta_description["content"] if meta_description else None,
-        meta_keywords["content"] if meta_keywords else None,)
+        meta_keywords["content"] if meta_keywords else None,
+    )
+
 
 def find_parent_that_doesnt_contain_h(tag, heading_tag):
     parent = tag.parent
@@ -112,23 +114,22 @@ def extract_headings_and_content(html):
 
     return text
 
+
 def clean_json_string(json_string):
-    
     pattern_opening = r"^(?:```json|json)\s*"
-    
+
     pattern_closing = r"\s*```$"
 
-    
     cleaned_string = re.sub(
         pattern_opening, "", json_string, flags=re.DOTALL | re.MULTILINE
     )
 
-    
     cleaned_string = re.sub(
         pattern_closing, "", cleaned_string, flags=re.DOTALL | re.MULTILINE
     )
 
     return cleaned_string.strip()
+
 
 antrasciu_struktura_create_query = """
             CREATE TABLE IF NOT EXISTS antrasciu_struktura (
@@ -143,6 +144,8 @@ teksto_korekcijos_rekomendacijos_create_query = """
                     reasoning TEXT
                 )
             """
+insert_into_antrasciu_struktura_query = "INSERT INTO antrasciu_struktura (heading, your_suggestion) VALUES ('{heading}', '{suggestion}')"
+
 
 def execute_query(database, query):
     with sqlite3.connect(database) as conn:
@@ -154,21 +157,53 @@ def execute_query(database, query):
 execute_query("heading_database.db", antrasciu_struktura_create_query)
 execute_query("webpage_database.db", teksto_korekcijos_rekomendacijos_create_query)
 
-def add_data():
 
+def add_data():
     with sqlite3.connect("heading_database.db") as conn:
         c = conn.cursor()
         for text in heading_text_list:
-            c.execute("INSERT INTO antrasciu_struktura (heading, your_suggestion) VALUES (?, ?)", 
-                      (text["heading"], text["your_suggestion"]))
-            
+            c.execute(
+                insert_into_antrasciu_struktura_query.format(
+                    heading=text["heading"], suggesion=text["your_suggestion"]
+                )
+            )
+
     with sqlite3.connect("webpage_database.db") as conn:
         c = conn.cursor()
         for text in corection_text_list:
-            c.execute("INSERT INTO teksto_korekcijos_rekomendacijos (original_word, suggested_correction, reasoning) VALUES (?, ?, ?)", 
-                      (text["original_word"], text["suggested_correction"], text["reasoning"]))
-            conn.commit()
-             
+            c.execute(
+                "INSERT INTO teksto_korekcijos_rekomendacijos (original_word, suggested_correction, reasoning) VALUES (?, ?, ?)",
+                (
+                    text["original_word"],
+                    text["suggested_correction"],
+                    text["reasoning"],
+                ),
+            )
+            conn.commit
+
+
+# def add_data():
+#     with sqlite3.connect("heading_database.db") as conn:
+#         c = conn.cursor()
+#         for text in heading_text_list:
+#             c.execute(
+#                 "INSERT INTO antrasciu_struktura (heading, your_suggestion) VALUES (?, ?)",
+#                 (text["heading"], text["your_suggestion"]),
+#             )
+
+#     with sqlite3.connect("webpage_database.db") as conn:
+#         c = conn.cursor()
+#         for text in corection_text_list:
+#             c.execute(
+#                 "INSERT INTO teksto_korekcijos_rekomendacijos (original_word, suggested_correction, reasoning) VALUES (?, ?, ?)",
+#                 (
+#                     text["original_word"],
+#                     text["suggested_correction"],
+#                     text["reasoning"],
+#                 ),
+#             )
+#             conn.commit()
+
 
 url_response = requests.get("https://15min.lt")
 
@@ -190,7 +225,7 @@ heading_text = clean_json_string(response_1.text)
 try:
     heading_text_list = json.loads(heading_text)
 except Exception:
-    response_1 = model.generate_content(PROMPT_SEO.format(text=informacija)) 
+    response_1 = model.generate_content(PROMPT_SEO.format(text=informacija))
     heading_text = clean_json_string(response_1.text)
     heading_text_list = json.loads(heading_text)
 
@@ -203,9 +238,4 @@ except Exception:
     corection_text = clean_json_string(response_2.text)
     corection_text_list = json.loads(corection_text)
 
-add_data()  
-
-
-
-
-
+add_data()
