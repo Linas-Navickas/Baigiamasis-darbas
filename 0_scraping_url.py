@@ -174,13 +174,11 @@ def add_data():
         for text in corection_text_list:
             c.execute(
                 insert_into_teksto_korekcijos.format(
-                    original_word=text["original_word"],
-                    suggested_correction=text["suggested_correction"],
-                    reasoning=text["reasoning"],
+                    original_word=text["original_word"].replace("'", ""),
+                    suggested_correction=text["suggested_correction"].replace("'", ""),
+                    reasoning=text["reasoning"].replace("'", ""),
                 )
             )
-
-            conn.commit
 
 
 # def add_data():
