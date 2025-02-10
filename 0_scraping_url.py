@@ -164,7 +164,7 @@ def add_data():
         for text in heading_text_list:
             c.execute(
                 insert_into_antrasciu_struktura_query.format(
-                    heading=text["heading"], suggesion=text["your_suggestion"]
+                    heading=text["heading"], suggestion=text["your_suggestion"]
                 )
             )
 
