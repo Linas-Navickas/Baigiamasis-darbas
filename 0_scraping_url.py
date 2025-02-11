@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 import json
 import re
 import sqlite3
+from gmail_client import GmailClient
 
 PROMPT_SEO = """
 You are experienced SEO professional. I will provide you with web page heading and text. You should provide suggestions 
@@ -174,11 +175,19 @@ def add_data(heading_text_list, corection_text_list):
         for text in corection_text_list:
             c.execute(
                 insert_into_teksto_korekcijos.format(
-                    original_word=text["original_word"].replace("'", ""),
-                    suggested_correction=text["suggested_correction"].replace("'", ""),
-                    reasoning=text["reasoning"].replace("'", ""),
+                    original_word=text.get("original_word", "").replace("'", ""),
+                    suggested_correction=text.get("suggested_correction", "").replace("'", ""),
+                    reasoning=text.get("reasoning", "").replace("'", ""),
                 )
             )
+
+def skaityti_laisko_duomenis(kelias):
+    with open(kelias, 'r') as dokumentas:
+        eilutes = dokumentas.readlines()
+        kam = eilutes[0].strip()
+        tema = eilutes[1].strip()
+        turinys = "".join(eilutes[2:]).strip()
+    return kam, tema, turinys
 
 url_response = requests.get("https://15min.lt")
 
@@ -213,4 +222,14 @@ except Exception:
     corection_text = clean_json_string(response_2.text)
     corection_text_list = json.loads(corection_text)
 
-add_data(heading_text_list=heading_text_list, corection_text_list=corection_text_list)
+if corection_text:
+    add_data(heading_text_list=heading_text_list, corection_text_list=corection_text_list)
+else:
+    print("Neirasyta i db") 
+
+gmail_client = GmailClient()
+
+kelias = "./mail_duomenys.txt"
+
+kam, tema, turinys = skaityti_laisko_duomenis(kelias) 
+gmail_client.send_email(kam, tema, turinys)   
