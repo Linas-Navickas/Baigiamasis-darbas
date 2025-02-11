@@ -48,14 +48,6 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel("gemini-1.5-flash-8b")
 
-robots_txt = "https://www.15min.lt/robots.txt"
-url_response = requests.get(robots_txt)
-
-if url_response.status_code == 200:
-    print("failas robots.txt rastas")
-else:
-    print("failas robots.txt nerastas.")
-
 
 def extract_meta(url_soup):
     meta_description = url_soup.find("meta", attrs={"name": "description"})
@@ -189,7 +181,16 @@ def skaityti_laisko_duomenis(kelias):
         turinys = "".join(eilutes[2:]).strip()
     return kam, tema, turinys
 
-url_response = requests.get("https://15min.lt")
+url = "https://15min.lt/"
+robots_txt = url + "robots.txt"
+url_response_robots = requests.get(robots_txt)
+
+if url_response_robots.status_code == 200:
+    print("failas robots.txt rastas")
+else:
+    print("failas robots.txt nerastas.")
+
+url_response = requests.get(url)
 
 url_soup = BeautifulSoup(url_response.text, "html.parser")
 
