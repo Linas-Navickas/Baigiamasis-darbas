@@ -1,12 +1,24 @@
-from bs4 import BeautifulSoup
-import requests
 import os
-import google.generativeai as genai
-from dotenv import load_dotenv
+import logging
 import json
 import re
 import sqlite3
-from gmail_client import GmailClient
+
+from bs4 import BeautifulSoup 
+import requests
+import google.generativeai as genai
+from dotenv import load_dotenv
+
+from gmail_client import GmailClient 
+
+load_dotenv("./API_raktas.env")
+
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+genai.configure(api_key=GEMINI_API_KEY)
+model = genai.GenerativeModel("gemini-1.5-flash-8b")
+
+logging.basicConfig(level=logging.INFO)
 
 PROMPT_SEO = """
 You are experienced SEO professional. I will provide you with web page heading and text. You should provide suggestions 
@@ -41,13 +53,29 @@ You should provide an answer is following JSON format:
 "reasoning": "<reasoning>"
 }}
 """
-load_dotenv("./API_raktas.env")
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+antrasciu_struktura_create_query = """
+            CREATE TABLE IF NOT EXISTS antrasciu_struktura (
+                heading TEXT,
+                your_suggestion TEXT
+            )
+        """
+teksto_korekcijos_rekomendacijos_create_query = """
+                CREATE TABLE IF NOT EXISTS teksto_korekcijos_rekomendacijos (
+                    original_word TEXT,
+                    suggested_correction TEXT,
+                    reasoning TEXT
+                )
+            """
+insert_into_antrasciu_struktura_query = "INSERT INTO antrasciu_struktura (heading, your_suggestion) VALUES ('{heading}', '{suggestion}')"
+insert_into_teksto_korekcijos = "INSERT INTO teksto_korekcijos_rekomendacijos (original_word, suggested_correction, reasoning) VALUES ('{original_word}', '{suggested_correction}', '{reasoning}')"
 
-genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel("gemini-1.5-flash-8b")
+url = "https://15min.lt/"
+robots_txt = url + "robots.txt"
 
+gmail_client = GmailClient()
+
+path_to_email_template = "./mail_duomenys.txt"
 
 def extract_meta(url_soup):
     meta_description = url_soup.find("meta", attrs={"name": "description"})
@@ -123,33 +151,11 @@ def clean_json_string(json_string):
 
     return cleaned_string.strip()
 
-
-antrasciu_struktura_create_query = """
-            CREATE TABLE IF NOT EXISTS antrasciu_struktura (
-                heading TEXT,
-                your_suggestion TEXT
-            )
-        """
-teksto_korekcijos_rekomendacijos_create_query = """
-                CREATE TABLE IF NOT EXISTS teksto_korekcijos_rekomendacijos (
-                    original_word TEXT,
-                    suggested_correction TEXT,
-                    reasoning TEXT
-                )
-            """
-insert_into_antrasciu_struktura_query = "INSERT INTO antrasciu_struktura (heading, your_suggestion) VALUES ('{heading}', '{suggestion}')"
-insert_into_teksto_korekcijos = "INSERT INTO teksto_korekcijos_rekomendacijos (original_word, suggested_correction, reasoning) VALUES ('{original_word}', '{suggested_correction}', '{reasoning}')"
-
-
 def execute_query(database, query):
     with sqlite3.connect(database) as conn:
         c = conn.cursor()
         c.execute(query)
         conn.commit()
-
-
-execute_query("heading_database.db", antrasciu_struktura_create_query)
-execute_query("webpage_database.db", teksto_korekcijos_rekomendacijos_create_query)
 
 
 def add_data(heading_text_list, corection_text_list):
@@ -181,14 +187,15 @@ def skaityti_laisko_duomenis(kelias):
         turinys = "".join(eilutes[2:]).strip()
     return kam, tema, turinys
 
-url = "https://15min.lt/"
-robots_txt = url + "robots.txt"
+execute_query("heading_database.db", antrasciu_struktura_create_query)
+execute_query("webpage_database.db", teksto_korekcijos_rekomendacijos_create_query)
+
 url_response_robots = requests.get(robots_txt)
 
 if url_response_robots.status_code == 200:
-    print("failas robots.txt rastas")
+    logging.info("failas robots.txt rastas. Status code: %d", url_response_robots.status_code) 
 else:
-    print("failas robots.txt nerastas.")
+    logging.warning("failas robots.txt nerastas. Status code: %d", url_response_robots.status_code)
 
 url_response = requests.get(url)
 
@@ -196,45 +203,42 @@ url_soup = BeautifulSoup(url_response.text, "html.parser")
 
 url_antrastes = url_soup.find_all("h1")
 description, keywords = extract_meta(url_soup)
-informacija = extract_headings_and_content(url_response.text)
-response_1 = model.generate_content(PROMPT_SEO.format(text=informacija))
+get_headings_info = extract_headings_and_content(url_response.text) 
+
+seo_response = model.generate_content(PROMPT_SEO.format(text=get_headings_info)) 
 
 url_text = url_soup.get_text()
 
 clean_text = " ".join(url_text.split())
 
 
-response_2 = model.generate_content(PROMPT_WORD.format(text=clean_text))
+word_response = model.generate_content(PROMPT_WORD.format(text=clean_text))
 
-heading_text = clean_json_string(response_1.text)
+heading_text = clean_json_string(seo_response.text)
 try:
     heading_text_list = json.loads(heading_text)
 except Exception:
-    response_1 = model.generate_content(PROMPT_SEO.format(text=informacija))
-    heading_text = clean_json_string(response_1.text)
+    seo_response = model.generate_content(PROMPT_SEO.format(text=get_headings_info))
+    heading_text = clean_json_string(seo_response.text)
     heading_text_list = json.loads(heading_text)
 
 
-corection_text = clean_json_string(response_2.text)
+corection_text = clean_json_string(word_response.text)
 try:
     corection_text_list = json.loads(corection_text)
 except Exception:
-    response_2 = model.generate_content(PROMPT_WORD.format(text=clean_text))
-    corection_text = clean_json_string(response_2.text)
+    word_response = model.generate_content(PROMPT_WORD.format(text=clean_text))
+    corection_text = clean_json_string(word_response.text)
     corection_text_list = json.loads(corection_text)
 
 if corection_text:
     add_data(heading_text_list=heading_text_list, corection_text_list=corection_text_list)
 else:
-    print("Neirasyta i db") 
+    logging.info("Neirasyta i db") 
 
-gmail_client = GmailClient()
-
-kelias = "./mail_duomenys.txt"
-
-kam, tema, turinys = skaityti_laisko_duomenis(kelias) 
+kam, tema, turinys = skaityti_laisko_duomenis(path_to_email_template) 
 gmail_client.send_email(kam, tema, turinys)   
-print("""Darbas atliktas:
+logging.info("""Darbas atliktas:
       web puslapis nuskaitytas
       duomenys sukelti i duomenu baze
       el. laiskas isiustas      
