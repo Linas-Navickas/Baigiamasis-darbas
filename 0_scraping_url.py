@@ -234,3 +234,8 @@ kelias = "./mail_duomenys.txt"
 
 kam, tema, turinys = skaityti_laisko_duomenis(kelias) 
 gmail_client.send_email(kam, tema, turinys)   
+print("""Darbas atliktas:
+      web puslapis nuskaitytas
+      duomenys sukelti i duomenu baze
+      el. laiskas isiustas      
+      """)
