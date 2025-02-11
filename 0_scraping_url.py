@@ -239,3 +239,4 @@ print("""Darbas atliktas:
       duomenys sukelti i duomenu baze
       el. laiskas isiustas      
       """)
+
