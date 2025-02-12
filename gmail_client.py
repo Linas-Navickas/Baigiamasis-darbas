@@ -59,5 +59,3 @@ class GmailClient:
 
         except HttpError as error:
             return f"An error occurred: {error}"
-
-

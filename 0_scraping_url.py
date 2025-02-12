@@ -1,15 +1,22 @@
 import os
 import logging
-import json
-import re
-import sqlite3
 
-from bs4 import BeautifulSoup 
+from bs4 import BeautifulSoup
 import requests
 import google.generativeai as genai
 from dotenv import load_dotenv
 
-from gmail_client import GmailClient 
+from gmail_client import GmailClient
+from utilities import (
+    file_exist,
+    extract_meta,
+    extract_headings_and_content,
+    clean_text_list,
+    execute_query,
+    add_data,
+    read_email_data,
+)
+
 
 load_dotenv("./API_raktas.env")
 
@@ -67,8 +74,6 @@ teksto_korekcijos_rekomendacijos_create_query = """
                     reasoning TEXT
                 )
             """
-insert_into_antrasciu_struktura_query = "INSERT INTO antrasciu_struktura (heading, your_suggestion) VALUES ('{heading}', '{suggestion}')"
-insert_into_teksto_korekcijos = "INSERT INTO teksto_korekcijos_rekomendacijos (original_word, suggested_correction, reasoning) VALUES ('{original_word}', '{suggested_correction}', '{reasoning}')"
 
 url = "https://15min.lt/"
 robots_txt = url + "robots.txt"
@@ -77,125 +82,12 @@ gmail_client = GmailClient()
 
 path_to_email_template = "./mail_duomenys.txt"
 
-def extract_meta(url_soup):
-    meta_description = url_soup.find("meta", attrs={"name": "description"})
-    meta_keywords = url_soup.find("meta", attrs={"name": "keywords"})
-    return (
-        meta_description["content"] if meta_description else None,
-        meta_keywords["content"] if meta_keywords else None,
-    )
-
-
-def find_parent_that_doesnt_contain_h(tag, heading_tag):
-    parent = tag.parent
-
-    has_another_h_tag = False
-    if parent is None:
-        return tag
-
-    all_parent_elements = parent.find_all()
-    for element in all_parent_elements:
-        if element.name.startswith("h") and element != heading_tag:
-            has_another_h_tag = True
-
-    if has_another_h_tag:
-        return tag
-
-    return find_parent_that_doesnt_contain_h(tag=parent, heading_tag=heading_tag)
-
-
-def extract_headings_and_content(html):
-    soup = BeautifulSoup(markup=html, features="html.parser")
-
-    headings = soup.find_all(["h1", "h2", "h3"])
-    headings_and_content = []
-
-    for heading in headings:
-        container = find_parent_that_doesnt_contain_h(tag=heading, heading_tag=heading)
-        elements_text = [
-            el.get_text(" ", strip=True)
-            for el in container
-            if el.get_text(" ", strip=True) and el != heading
-        ]
-
-        heading_text = heading.get_text(" ", strip=True)
-        siblings_text = " ".join(elements_text)
-        if heading_text != siblings_text:
-            headings_and_content.append(
-                {
-                    "heading": heading_text,
-                    "text": siblings_text,
-                }
-            )
-
-    text = ""
-    for el in headings_and_content:
-        for key, value in el.items():
-            text += f"{key}: {value}\n"
-
-    return text
-
-
-def clean_json_string(json_string):
-    pattern_opening = r"^(?:```json|json)\s*"
-
-    pattern_closing = r"\s*```$"
-
-    cleaned_string = re.sub(
-        pattern_opening, "", json_string, flags=re.DOTALL | re.MULTILINE
-    )
-
-    cleaned_string = re.sub(
-        pattern_closing, "", cleaned_string, flags=re.DOTALL | re.MULTILINE
-    )
-
-    return cleaned_string.strip()
-
-def execute_query(database, query):
-    with sqlite3.connect(database) as conn:
-        c = conn.cursor()
-        c.execute(query)
-        conn.commit()
-
-
-def add_data(heading_text_list, corection_text_list):
-    with sqlite3.connect("heading_database.db") as conn:
-        c = conn.cursor()
-        for text in heading_text_list:
-            c.execute(
-                insert_into_antrasciu_struktura_query.format(
-                    heading=text["heading"], suggestion=text["your_suggestion"]
-                )
-            )
-
-    with sqlite3.connect("webpage_database.db") as conn:
-        c = conn.cursor()
-        for text in corection_text_list:
-            c.execute(
-                insert_into_teksto_korekcijos.format(
-                    original_word=text.get("original_word", "").replace("'", ""),
-                    suggested_correction=text.get("suggested_correction", "").replace("'", ""),
-                    reasoning=text.get("reasoning", "").replace("'", ""),
-                )
-            )
-
-def skaityti_laisko_duomenis(kelias):
-    with open(kelias, 'r') as dokumentas:
-        eilutes = dokumentas.readlines()
-        kam = eilutes[0].strip()
-        tema = eilutes[1].strip()
-        turinys = "".join(eilutes[2:]).strip()
-    return kam, tema, turinys
-
 execute_query("heading_database.db", antrasciu_struktura_create_query)
 execute_query("webpage_database.db", teksto_korekcijos_rekomendacijos_create_query)
 
 url_response_robots = requests.get(robots_txt)
 
-if url_response_robots.status_code == 200:
-    logging.info("failas robots.txt rastas. Status code: %d", url_response_robots.status_code) 
-else:
-    logging.warning("failas robots.txt nerastas. Status code: %d", url_response_robots.status_code)
+file_exist(response=url_response_robots, file_name="robots.txt")
 
 url_response = requests.get(url)
 
@@ -203,44 +95,39 @@ url_soup = BeautifulSoup(url_response.text, "html.parser")
 
 url_antrastes = url_soup.find_all("h1")
 description, keywords = extract_meta(url_soup)
-get_headings_info = extract_headings_and_content(url_response.text) 
+get_headings_info = extract_headings_and_content(url_response.text)
 
-seo_response = model.generate_content(PROMPT_SEO.format(text=get_headings_info)) 
+seo_llm_response = model.generate_content(PROMPT_SEO.format(text=get_headings_info))
 
 url_text = url_soup.get_text()
 
 clean_text = " ".join(url_text.split())
 
 
-word_response = model.generate_content(PROMPT_WORD.format(text=clean_text))
+word_llm_response = model.generate_content(PROMPT_WORD.format(text=clean_text))
 
-heading_text = clean_json_string(seo_response.text)
-try:
-    heading_text_list = json.loads(heading_text)
-except Exception:
-    seo_response = model.generate_content(PROMPT_SEO.format(text=get_headings_info))
-    heading_text = clean_json_string(seo_response.text)
-    heading_text_list = json.loads(heading_text)
+heading_text_list = clean_text_list(
+    text=seo_llm_response.text, prompt=(PROMPT_SEO.format(text=get_headings_info))
+)
+corection_text_list = clean_text_list(
+    text=word_llm_response.text, prompt=(PROMPT_WORD.format(text=clean_text))
+)
 
 
-corection_text = clean_json_string(word_response.text)
-try:
-    corection_text_list = json.loads(corection_text)
-except Exception:
-    word_response = model.generate_content(PROMPT_WORD.format(text=clean_text))
-    corection_text = clean_json_string(word_response.text)
-    corection_text_list = json.loads(corection_text)
-
-if corection_text:
-    add_data(heading_text_list=heading_text_list, corection_text_list=corection_text_list)
+if corection_text_list and heading_text_list:
+    add_data(
+        heading_text_list=heading_text_list, corection_text_list=corection_text_list
+    )
 else:
-    logging.info("Neirasyta i db") 
+    logging.info("Neirasyta i db")
 
-kam, tema, turinys = skaityti_laisko_duomenis(path_to_email_template) 
-gmail_client.send_email(kam, tema, turinys)   
-logging.info("""Darbas atliktas:
-      web puslapis nuskaitytas
-      duomenys sukelti i duomenu baze
-      el. laiskas isiustas      
-      """)
-
+kam, tema, turinys = read_email_data(path_to_email_template)
+gmail_client.send_email(kam, tema, turinys)
+logging.info(
+    """
+    Darbas atliktas:
+    - Web puslapis nuskaitytas
+    - Duomenys sukelti į duomenų bazę
+    - El. laiškas išsiųstas
+"""
+)
