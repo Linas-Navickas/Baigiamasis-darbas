@@ -2,7 +2,6 @@ import json
 import re
 import sqlite3
 import logging
-import os
 
 from bs4 import BeautifulSoup
 import google.generativeai as genai
