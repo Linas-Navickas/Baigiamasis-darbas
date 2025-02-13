@@ -8,8 +8,6 @@ import google.generativeai as genai
 
 MODEL = genai.GenerativeModel("gemini-1.5-flash-8b")
 
-insert_into_antrasciu_struktura_query = "INSERT INTO antrasciu_struktura (heading, your_suggestion) VALUES ('{heading}', '{suggestion}')"
-insert_into_teksto_korekcijos = "INSERT INTO teksto_korekcijos_rekomendacijos (original_word, suggested_correction, reasoning) VALUES ('{original_word}', '{suggested_correction}', '{reasoning}')"
 
 class Scraper:
     def __init__(self):
@@ -27,7 +25,6 @@ class Scraper:
             )
             return False
 
-
     def extract_meta(self, url_soup):
         meta_description = url_soup.find("meta", attrs={"name": "description"})
         meta_keywords = url_soup.find("meta", attrs={"name": "keywords"})
@@ -35,7 +32,6 @@ class Scraper:
             meta_description["content"] if meta_description else None,
             meta_keywords["content"] if meta_keywords else None,
         )
-
 
     def find_parent_that_doesnt_contain_h(self, tag, heading_tag):
         parent = tag.parent
@@ -52,8 +48,9 @@ class Scraper:
         if has_another_h_tag:
             return tag
 
-        return self.find_parent_that_doesnt_contain_h(tag=parent, heading_tag=heading_tag)
-
+        return self.find_parent_that_doesnt_contain_h(
+            tag=parent, heading_tag=heading_tag
+        )
 
     def extract_headings_and_content(self, html):
         soup = BeautifulSoup(markup=html, features="html.parser")
@@ -62,7 +59,9 @@ class Scraper:
         headings_and_content = []
 
         for heading in headings:
-            container = self.find_parent_that_doesnt_contain_h(tag=heading, heading_tag=heading)
+            container = self.find_parent_that_doesnt_contain_h(
+                tag=heading, heading_tag=heading
+            )
             elements_text = [
                 el.get_text(" ", strip=True)
                 for el in container
@@ -86,12 +85,12 @@ class Scraper:
 
         return text
 
+
 class LLM_Client:
     def __init__(self):
         pass
 
     def clean_json_string(self, json_string):
-
         pattern_opening = r"^(?:```json|json)\s*"
 
         pattern_closing = r"\s*```$"
@@ -106,7 +105,6 @@ class LLM_Client:
 
         return cleaned_string.strip()
 
-
     def clean_text_list(self, text, prompt):
         try:
             text_list = json.loads(text)
@@ -115,6 +113,7 @@ class LLM_Client:
             cleaned_text = self.clean_json_string(llm_response.text)
             text_list = json.loads(cleaned_text)
         return text_list
+
 
 class DataBase:
     def __init__(self):
@@ -125,30 +124,6 @@ class DataBase:
             c = conn.cursor()
             c.execute(query)
             conn.commit()
-
-
-    def add_data(self, heading_text_list, corection_text_list):
-        with sqlite3.connect("heading_database.db") as conn:
-            c = conn.cursor()
-            for text in heading_text_list:
-                c.execute(
-                    insert_into_antrasciu_struktura_query.format(
-                        heading=text["heading"], suggestion=text["your_suggestion"]
-                    )
-                )
-
-        with sqlite3.connect("webpage_database.db") as conn:
-            c = conn.cursor()
-            for text in corection_text_list:
-                c.execute(
-                    insert_into_teksto_korekcijos.format(
-                        original_word=text.get("original_word", "").replace("'", ""),
-                        suggested_correction=text.get("suggested_correction", "").replace(
-                            "'", ""
-                        ),
-                        reasoning=text.get("reasoning", "").replace("'", ""),
-                    )
-                )
 
 
 def read_email_data(kelias):

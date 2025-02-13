@@ -19,14 +19,10 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 genai.configure(api_key=GEMINI_API_KEY)
 MODEL = genai.GenerativeModel("gemini-1.5-flash-8b")
 
-URL = "https://15min.lt/" # padaryti kintamuosius didziosioms raidem
+URL = "https://15min.lt/"  # padaryti kintamuosius didziosioms raidem
 ROBOTS_TXT = URL + "robots.txt"
 PATH_TO_EMAIL_TEMPLATE = "./mail_duomenys.txt"
 
-gmail_client = GmailClient()
-web_scraper = Scraper()
-db = DataBase()
-llm = LLM_Client()
 
 logging.basicConfig(level=logging.INFO)
 
@@ -64,13 +60,13 @@ You should provide an answer is following JSON format:
 }}
 """
 
-antrasciu_struktura_create_query = """
+ANTRASCIU_STRUKTURA_CREATE_QUERY = """
             CREATE TABLE IF NOT EXISTS antrasciu_struktura (
                 heading TEXT,
                 your_suggestion TEXT
             )
         """
-teksto_korekcijos_rekomendacijos_create_query = """
+TEKSTO_KOREKCIJOS_REKOMENDACIJOS_CREATE_QUERY = """
                 CREATE TABLE IF NOT EXISTS teksto_korekcijos_rekomendacijos (
                     original_word TEXT,
                     suggested_correction TEXT,
@@ -78,8 +74,17 @@ teksto_korekcijos_rekomendacijos_create_query = """
                 )
             """
 
-db.execute_query("heading_database.db", antrasciu_struktura_create_query)
-db.execute_query("webpage_database.db", teksto_korekcijos_rekomendacijos_create_query)
+INSERT_INTO_ANTRASCIU_STRUKTURA_QUERY = "INSERT INTO antrasciu_struktura (heading, your_suggestion) VALUES ('{heading}', '{suggestion}')"
+INSERT_INTO_TEKSTO_KOREKCIJOS = "INSERT INTO teksto_korekcijos_rekomendacijos (original_word, suggested_correction, reasoning) VALUES ('{original_word}', '{suggested_correction}', '{reasoning}')"
+
+gmail_client = GmailClient()
+web_scraper = Scraper()
+db = DataBase()
+llm = LLM_Client()
+
+db.execute_query("heading_database.db", ANTRASCIU_STRUKTURA_CREATE_QUERY)
+db.execute_query("webpage_database.db", TEKSTO_KOREKCIJOS_REKOMENDACIJOS_CREATE_QUERY)
+
 
 url_response_robots = requests.get(ROBOTS_TXT)
 web_scraper.file_exist(response=url_response_robots, file_name="robots.txt")
@@ -106,9 +111,19 @@ corection_text_list = llm.clean_text_list(
 )
 
 if corection_text_list and heading_text_list:
-    db.add_data(
-        heading_text_list=heading_text_list, corection_text_list=corection_text_list
-    )
+    for text in heading_text_list:
+        query = INSERT_INTO_ANTRASCIU_STRUKTURA_QUERY.format(
+            heading=text["heading"], suggestion=text["your_suggestion"]
+        )
+        db.execute_query(database="heading_database.db", query=query)
+
+    for text in corection_text_list:
+        query = INSERT_INTO_TEKSTO_KOREKCIJOS.format(
+            original_word=text.get("original_word", "").replace("'", ""),
+            suggested_correction=text.get("suggested_correction", "").replace("'", ""),
+            reasoning=text.get("reasoning", "").replace("'", ""),
+        )
+        db.execute_query(database="webpage_database.", query=query)
 else:
     logging.info("Neirasyta i db")
 
