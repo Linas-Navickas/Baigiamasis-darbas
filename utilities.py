@@ -6,8 +6,12 @@ import logging
 from bs4 import BeautifulSoup
 import google.generativeai as genai
 
-model = genai.GenerativeModel("gemini-1.5-flash-8b")
+MODEL = genai.GenerativeModel("gemini-1.5-flash-8b")
 
+insert_into_antrasciu_struktura_query = "INSERT INTO antrasciu_struktura (heading, your_suggestion) VALUES ('{heading}', '{suggestion}')"
+insert_into_teksto_korekcijos = "INSERT INTO teksto_korekcijos_rekomendacijos (original_word, suggested_correction, reasoning) VALUES ('{original_word}', '{suggested_correction}', '{reasoning}')"
+
+# sukurti klase scraper
 
 def file_exist(response, file_name):
     if response.status_code == 200:
@@ -80,7 +84,6 @@ def extract_headings_and_content(html):
 
     return text
 
-
 def clean_json_string(json_string):
 
     pattern_opening = r"^(?:```json|json)\s*"
@@ -102,10 +105,8 @@ def clean_text_list(text, prompt):
     try:
         text_list = json.loads(text)
     except Exception:
-        llm_response = model.generate_content(prompt)
+        llm_response = MODEL.generate_content(prompt)
         cleaned_text = clean_json_string(llm_response.text)
-        # print(cleaned_text)
-        # print("++++++++++++")
         text_list = json.loads(cleaned_text)
     return text_list
 
@@ -115,10 +116,6 @@ def execute_query(database, query):
         c = conn.cursor()
         c.execute(query)
         conn.commit()
-
-
-insert_into_antrasciu_struktura_query = "INSERT INTO antrasciu_struktura (heading, your_suggestion) VALUES ('{heading}', '{suggestion}')"
-insert_into_teksto_korekcijos = "INSERT INTO teksto_korekcijos_rekomendacijos (original_word, suggested_correction, reasoning) VALUES ('{original_word}', '{suggested_correction}', '{reasoning}')"
 
 
 def add_data(heading_text_list, corection_text_list):
