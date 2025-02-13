@@ -15,7 +15,7 @@ class Scraper:
 
     def file_exist(self, response, file_name):
         if response.status_code == 200:
-            logging.info(
+            logging.warning(
                 f"failas {file_name} rastas. Status code: %d", response.status_code
             )
             return True
@@ -24,6 +24,7 @@ class Scraper:
                 f"failas {file_name} nerastas. Status code: %d", response.status_code
             )
             return False
+            
 
     def extract_meta(self, url_soup):
         meta_description = url_soup.find("meta", attrs={"name": "description"})
@@ -113,17 +114,6 @@ class LLM_Client:
             cleaned_text = self.clean_json_string(llm_response.text)
             text_list = json.loads(cleaned_text)
         return text_list
-
-
-class DataBase:
-    def __init__(self):
-        pass
-
-    def execute_query(self, database, query):
-        with sqlite3.connect(database) as conn:
-            c = conn.cursor()
-            c.execute(query)
-            conn.commit()
 
 
 def read_email_data(kelias):

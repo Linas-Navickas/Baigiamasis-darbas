@@ -9,9 +9,8 @@ from dotenv import load_dotenv
 from gmail_client import GmailClient
 from utilities import read_email_data
 from utilities import Scraper
-from utilities import DataBase
+from db import DataBase
 from utilities import LLM_Client
-
 
 load_dotenv("./API_raktas.env")
 
@@ -23,8 +22,6 @@ URL = "https://15min.lt/"  # padaryti kintamuosius didziosioms raidem
 ROBOTS_TXT = URL + "robots.txt"
 PATH_TO_EMAIL_TEMPLATE = "./mail_duomenys.txt"
 
-
-logging.basicConfig(level=logging.INFO)
 
 PROMPT_SEO = """
 You are experienced SEO professional. I will provide you with web page heading and text. You should provide suggestions 
@@ -77,6 +74,7 @@ TEKSTO_KOREKCIJOS_REKOMENDACIJOS_CREATE_QUERY = """
 INSERT_INTO_ANTRASCIU_STRUKTURA_QUERY = "INSERT INTO antrasciu_struktura (heading, your_suggestion) VALUES ('{heading}', '{suggestion}')"
 INSERT_INTO_TEKSTO_KOREKCIJOS = "INSERT INTO teksto_korekcijos_rekomendacijos (original_word, suggested_correction, reasoning) VALUES ('{original_word}', '{suggested_correction}', '{reasoning}')"
 
+load_dotenv("./API_raktas.env")
 gmail_client = GmailClient()
 web_scraper = Scraper()
 db = DataBase()
@@ -123,17 +121,17 @@ if corection_text_list and heading_text_list:
             suggested_correction=text.get("suggested_correction", "").replace("'", ""),
             reasoning=text.get("reasoning", "").replace("'", ""),
         )
-        db.execute_query(database="webpage_database.", query=query)
+        db.execute_query(database="webpage_database.db", query=query)
 else:
-    logging.info("Neirasyta i db")
+    logging.warning("Neirasyta i db")
 
 kam, tema, turinys = read_email_data(PATH_TO_EMAIL_TEMPLATE)
 gmail_client.send_email(kam, tema, turinys)
-logging.info(
+logging.warning(
     """
     Darbas atliktas:
     - Web puslapis nuskaitytas
-    - Duomenys sukelti į duomenų bazę
-    - El. laiškas išsiųstas
+    - Duomenys sukelti i duomenų baze
+    - El. laiskas issiustas
 """
 )
