@@ -7,15 +7,11 @@ import google.generativeai as genai
 from dotenv import load_dotenv
 
 from gmail_client import GmailClient
-from utilities import (
-    file_exist,
-    extract_meta,
-    extract_headings_and_content,
-    clean_text_list,
-    execute_query,
-    add_data,
-    read_email_data,
-)
+from utilities import read_email_data
+from utilities import Scraper
+from utilities import DataBase
+from utilities import LLM_Client
+
 
 load_dotenv("./API_raktas.env")
 
@@ -28,6 +24,9 @@ ROBOTS_TXT = URL + "robots.txt"
 PATH_TO_EMAIL_TEMPLATE = "./mail_duomenys.txt"
 
 gmail_client = GmailClient()
+web_scraper = Scraper()
+db = DataBase()
+llm = LLM_Client()
 
 logging.basicConfig(level=logging.INFO)
 
@@ -79,21 +78,21 @@ teksto_korekcijos_rekomendacijos_create_query = """
                 )
             """
 
-execute_query("heading_database.db", antrasciu_struktura_create_query)
-execute_query("webpage_database.db", teksto_korekcijos_rekomendacijos_create_query)
+db.execute_query("heading_database.db", antrasciu_struktura_create_query)
+db.execute_query("webpage_database.db", teksto_korekcijos_rekomendacijos_create_query)
 
 url_response_robots = requests.get(ROBOTS_TXT)
-file_exist(response=url_response_robots, file_name="robots.txt")
+web_scraper.file_exist(response=url_response_robots, file_name="robots.txt")
 
 url_response = requests.get(URL)
 url_soup = BeautifulSoup(url_response.text, "html.parser")
 
 url_antrastes = url_soup.find_all("h1")
-description, keywords = extract_meta(url_soup)
-get_headings_info = extract_headings_and_content(url_response.text)
+description, keywords = web_scraper.extract_meta(url_soup)
+get_headings_info = web_scraper.extract_headings_and_content(url_response.text)
 
 seo_llm_response = MODEL.generate_content(PROMPT_SEO.format(text=get_headings_info))
-heading_text_list = clean_text_list(
+heading_text_list = llm.clean_text_list(
     text=seo_llm_response.text, prompt=(PROMPT_SEO.format(text=get_headings_info))
 )
 
@@ -102,12 +101,12 @@ url_text = url_soup.get_text()
 clean_text = " ".join(url_text.split())
 
 word_llm_response = MODEL.generate_content(PROMPT_WORD.format(text=clean_text))
-corection_text_list = clean_text_list(
+corection_text_list = llm.clean_text_list(
     text=word_llm_response.text, prompt=(PROMPT_WORD.format(text=clean_text))
 )
 
 if corection_text_list and heading_text_list:
-    add_data(
+    db.add_data(
         heading_text_list=heading_text_list, corection_text_list=corection_text_list
     )
 else:
