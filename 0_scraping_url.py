@@ -17,7 +17,6 @@ from utilities import (
     read_email_data,
 )
 
-
 load_dotenv("./API_raktas.env")
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
